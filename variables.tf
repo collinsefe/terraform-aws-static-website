@@ -97,7 +97,7 @@ variable "website_cors_expose_headers" {
 variable "website_cors_max_age_seconds" {
   description = "(Optional) Specifies time in seconds that browser can cache the response for a preflight request. Defaults to 3600"
   type        = number
-  default     = 3600
+  default     = 60
 }
 
 variable "website_versioning_status" {
@@ -237,7 +237,7 @@ variable "cloudfront_geo_restriction_type" {
 variable "cloudfront_geo_restriction_locations" {
   description = "(Optional) - The ISO 3166-1-alpha-2 codes for which you want CloudFront either to distribute your content (whitelist) or not distribute your content (blacklist). Defaults to []"
   type        = list(string)
-  default     =  ["US", "CA", "GB", "DE"]
+  default     = ["US", "CA", "GB", "DE"]
 }
 
 variable "cloudfront_website_retain_on_delete" {

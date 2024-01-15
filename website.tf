@@ -8,6 +8,7 @@ resource "aws_cloudfront_origin_access_identity" "cf_oai" {
   comment = "OAI to restrict access to AWS S3 content"
 }
 
+
 #-------------------------------------------------------------------------
 # Website S3 Bucket
 #------------------------------------------------------------------------------
@@ -20,8 +21,7 @@ resource "aws_kms_key" "mykey" {
 }
 
 resource "aws_s3_bucket" "website" {
-  provider = aws.main
-
+  provider      = aws.main
   bucket        = local.website_bucket_name
   force_destroy = var.website_bucket_force_destroy
 
@@ -53,6 +53,23 @@ resource "aws_s3_object" "website" {
 }
 
 
+resource "aws_s3_bucket_acl" "website" {
+  provider = aws.main
+
+  bucket     = aws_s3_bucket.website.id
+  acl        = var.website_bucket_acl
+  depends_on = [aws_s3_bucket_ownership_controls.s3_bucket_acl_ownership]
+}
+
+
+# Resource to avoid error "AccessControlListNotSupported: The bucket does not allow ACLs"
+resource "aws_s3_bucket_ownership_controls" "s3_bucket_acl_ownership" {
+  provider = aws.main
+  bucket   = aws_s3_bucket.website.id
+  rule {
+    object_ownership = "ObjectWriter"
+  }
+}
 
 resource "aws_s3_bucket_versioning" "website" {
   provider = aws.main
@@ -70,14 +87,11 @@ resource "aws_s3_bucket_logging" "website" {
   bucket        = aws_s3_bucket.website.id
   target_bucket = module.s3_logs_bucket.s3_bucket_id
   target_prefix = "website/"
+
 }
 
-resource "aws_s3_bucket_acl" "website" {
-  provider = aws.main
 
-  bucket = aws_s3_bucket.website.id
-  acl    = var.website_bucket_acl
-}
+
 
 resource "aws_s3_bucket_policy" "website" {
   provider = aws.main
@@ -107,7 +121,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "website" {
     apply_server_side_encryption_by_default {
 
       #kms_master_key_id = aws_kms_key.mykey.arn
-      sse_algorithm     = "AES256"
+      sse_algorithm = "AES256"
 
     }
   }
@@ -130,22 +144,21 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "website_bucket_we
         for_each = try([rule.value.apply_server_side_encryption_by_default], [])
 
         content {
-          #kms_master_key_id = aws_kms_key.mykey.arn
-          #sse_algorithm     = "aws:kms"
-          sse_algorithm     = apply_server_side_encryption_by_default.value.sse_algorithm
-          #kms_master_key_id = try(apply_server_side_encryption_by_default.value.kms_master_key_id, null)
+          sse_algorithm = apply_server_side_encryption_by_default.value.sse_algorithm
         }
       }
-    } 
+    }
   }
 }
+
+
 
 #------------------------------------------------------------------------------
 # Cloudfront for S3 Bucket Website
 #------------------------------------------------------------------------------
 # 
 
-resource "aws_cloudfront_distribution" "website" { 
+resource "aws_cloudfront_distribution" "website" {
   provider = aws.main
 
   aliases = var.www_website_redirect_enabled ? [
@@ -154,9 +167,8 @@ resource "aws_cloudfront_distribution" "website" {
   ] : [local.website_bucket_name]
 
   web_acl_id = var.cloudfront_web_acl_id
+  comment    = var.comment_for_cloudfront_website
 
-  comment = var.comment_for_cloudfront_website
-  
 
   default_cache_behavior {
     cache_policy_id          = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
@@ -174,7 +186,7 @@ resource "aws_cloudfront_distribution" "website" {
       }
     }
   }
-  
+
   /*
   dynamic "custom_error_response" {
     for_each = var.cloudfront_custom_error_responses
@@ -186,21 +198,21 @@ resource "aws_cloudfront_distribution" "website" {
     }
   }
   */
-  
- custom_error_response {
-        error_caching_min_ttl = 86400
-        error_code = 404
-        response_code = 200
-        response_page_path = "/error.html"
- }
 
   custom_error_response {
-        error_caching_min_ttl = 86400
-        error_code = 403
-        response_code = 200
-        response_page_path = "/error.html"
- }
-    
+    error_caching_min_ttl = 86400
+    error_code            = 404
+    response_code         = 200
+    response_page_path    = "/error.html"
+  }
+
+  custom_error_response {
+    error_caching_min_ttl = 86400
+    error_code            = 403
+    response_code         = 200
+    response_page_path    = "/error.html"
+  }
+
 
   default_root_object = var.cloudfront_default_root_object
   enabled             = true
